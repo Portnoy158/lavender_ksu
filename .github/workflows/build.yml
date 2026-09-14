@@ -36,6 +36,11 @@ jobs:
             sed -i 's/unlikely(in_compat_syscall())/unlikely(is_compat_task())/g' drivers/kernelsu/sulog/event.c
           fi
 
+          # Fix ALIGN_DOWN for kernel 4.4
+          if [ -f drivers/kernelsu/feature/adb_root.c ]; then
+            sed -i 's/ALIGN_DOWN/ALIGN/g' drivers/kernelsu/feature/adb_root.c
+          fi
+
           echo "CONFIG_KSU=y" >> arch/arm64/configs/lavender-perf_defconfig
           echo "CONFIG_KSU=y" >> arch/arm64/configs/lavender-perf_defconfig
           echo "CONFIG_KSU_SUSFS=y" >> arch/arm64/configs/lavender-perf_defconfig
