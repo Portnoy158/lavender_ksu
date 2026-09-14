@@ -28,7 +28,7 @@ jobs:
           git clone --depth=1 https://github.com/LineageOS/android_prebuilts_gcc_linux-x86_aarch64_aarch64-linux-android-4.9 gcc64
           git clone --depth=1 https://github.com/LineageOS/android_prebuilts_gcc_linux-x86_arm_arm-linux-androideabi-4.9 gcc32
 
-      - name: Build Kernel Image
+            - name: Build Kernel Image
         run: |
           export PATH="$GITHUB_WORKSPACE/toolchain/clang/bin:$GITHUB_WORKSPACE/toolchain/gcc64/bin:$GITHUB_WORKSPACE/toolchain/gcc32/bin:$PATH"
           export ARCH=arm64
@@ -39,7 +39,8 @@ jobs:
           export CROSS_COMPILE_ARM32=arm-linux-androideabi-
 
           make O=out lavender-perf_defconfig
-          make -j$(nproc --all) O=out
+          make -j$(nproc --all) O=out HOSTCFLAGS="-fcommon" HOSTCXXFLAGS="-fcommon"
+
 
       - name: Pack to AnyKernel3
         run: |
