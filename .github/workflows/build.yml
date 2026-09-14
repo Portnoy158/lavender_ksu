@@ -23,46 +23,72 @@ jobs:
           git clone --depth=1 https://github.com/LineageOS/android_prebuilts_gcc_linux-x86_aarch64_aarch64-linux-android-4.9 gcc64
           git clone --depth=1 https://github.com/LineageOS/android_prebuilts_gcc_linux-x86_arm_arm-linux-androideabi-4.9 gcc32
 
-      - name: Integrate Features (KSU Next, SUSFS, Dynamic Uptime)
+      - name: Integrate Features (KSU Next + Manual Hooks + SUSFS + Uptime)
         run: |
-          # Git Config
           git config user.name "Portnoy158"
           git config user.email "portnoy@example.com"
 
-          # ============================================
-          # 1. Integrate KernelSU Next (cara resmi)
-          # ============================================
+          # 1. KernelSU Next
           curl -LSs "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/next/kernel/setup.sh" | bash -s legacy
 
-          # Enable config KSU
           echo "CONFIG_KSU=y" >> arch/arm64/configs/lavender-perf_defconfig
           echo "CONFIG_KSU_SUSFS=y" >> arch/arm64/configs/lavender-perf_defconfig
           echo "CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT=y" >> arch/arm64/configs/lavender-perf_defconfig
           echo "CONFIG_KSU_SUSFS_SUS_PATH=y" >> arch/arm64/configs/lavender-perf_defconfig
           echo "CONFIG_KSU_SUSFS_SUS_MOUNT=y" >> arch/arm64/configs/lavender-perf_defconfig
 
-          # ============================================
-          # 2. Integrate SUSFS (v1.5.5 for Kernel 4.4)
-          # ============================================
+          # 2. Manual Hooks untuk kernel 4.4
+
+          # fs/exec.c
+          if ! grep -q "ksu_handle_execveat" fs/exec.c; then
+            sed -i '/int do_execve(struct filename \*filename,/i#ifdef CONFIG_KSU\n__attribute__((hot))\nextern int ksu_handle_execveat(int *fd, struct filename **filename_ptr,\n\t\t\t\tvoid *argv, void *envp, int *flags);\n#endif' fs/exec.c
+            sed -i '/return do_execveat_common(AT_FDCWD, filename, argv, envp, 0);/i#ifdef CONFIG_KSU\n\tksu_handle_execveat((int *)AT_FDCWD, \&filename, \&argv, \&envp, 0);\n#endif' fs/exec.c
+          fi
+
+          # fs/open.c
+          if ! grep -q "ksu_handle_faccessat" fs/open.c; then
+            sed -i '/SYSCALL_DEFINE3(faccessat, int, dfd, const char __user \*, filename, int, mode)/i#ifdef CONFIG_KSU\n__attribute__((hot))\nextern int ksu_handle_faccessat(int *dfd, const char __user **filename_user,\n\t\t\t\tint *mode, int *flags);\n#endif' fs/open.c
+            sed -i '/if (mode \& \~S_IRWXO)/i#ifdef CONFIG_KSU\n\tksu_handle_faccessat(\&dfd, \&filename, \&mode, NULL);\n#endif' fs/open.c
+          fi
+
+          # fs/read_write.c
+          if ! grep -q "ksu_handle_sys_read" fs/read_write.c; then
+            sed -i '/SYSCALL_DEFINE3(read, unsigned int, fd, char __user \*, buf, size_t, count)/i#ifdef CONFIG_KSU\nextern bool ksu_vfs_read_hook __read_mostly;\nextern __attribute__((cold)) int ksu_handle_sys_read(unsigned int fd,\n\t\t\t\tchar __user **buf_ptr, size_t *count_ptr);\n#endif' fs/read_write.c
+            sed -i '/struct fd f = fdget_pos(fd);/a#ifdef CONFIG_KSU\n\tif (unlikely(ksu_vfs_read_hook))\n\t\tksu_handle_sys_read(fd, \&buf, \&count);\n#endif' fs/read_write.c
+          fi
+
+          # fs/stat.c
+          if ! grep -q "ksu_handle_stat" fs/stat.c; then
+            sed -i '/SYSCALL_DEFINE4(newfstatat, int, dfd, const char __user \*, filename,/i#ifdef CONFIG_KSU\n__attribute__((hot))\nextern int ksu_handle_stat(int *dfd, const char __user **filename_user,\n\t\t\t\tint *flags);\n#endif' fs/stat.c
+            sed -i '/error = vfs_fstatat(dfd, filename, \&stat, flag);/i#ifdef CONFIG_KSU\n\tksu_handle_stat(\&dfd, \&filename, \&flag);\n#endif' fs/stat.c
+          fi
+
+          # kernel/reboot.c
+          if ! grep -q "ksu_handle_sys_reboot" kernel/reboot.c; then
+            sed -i '/SYSCALL_DEFINE4(reboot, int, magic1, int, magic2, unsigned int, cmd,/i#ifdef CONFIG_KSU\nextern int ksu_handle_sys_reboot(int magic1, int magic2, unsigned int cmd, void __user **arg);\n#endif' kernel/reboot.c
+            sed -i '/if (!ns_capable(pid_ns->user_ns, CAP_SYS_BOOT))/i#ifdef CONFIG_KSU\n\tksu_handle_sys_reboot(magic1, magic2, cmd, \&arg);\n#endif' kernel/reboot.c
+          fi
+
+          echo "[+] Manual hooks applied"
+
+          # 3. SUSFS
           git clone https://github.com/sidex15/ksu_susfs.git -b 4.4 susfs_patcher || true
           if [ -d "susfs_patcher" ]; then
             cp -r susfs_patcher/fs/susfs fs/ 2>/dev/null || true
             cp susfs_patcher/include/linux/susfs.h include/linux/ 2>/dev/null || true
-            
             patch -p1 < susfs_patcher/patches/fs/open.c.patch 2>/dev/null || true
             patch -p1 < susfs_patcher/patches/fs/stat.c.patch 2>/dev/null || true
             patch -p1 < susfs_patcher/patches/fs/dcache.c.patch 2>/dev/null || true
           fi
 
-          # ============================================
-          # 3. Dynamic Uptime Hack (Permission Fix: 0644)
-          # ============================================
-          echo '#include <linux/moduleparam.h>' >> kernel/time/timekeeping.c
-          echo 'static int fake_uptime_sec = 86400;' >> kernel/time/timekeeping.c
-          echo 'module_param(fake_uptime_sec, int, 0644);' >> kernel/time/timekeeping.c
-          echo 'MODULE_PARM_DESC(fake_uptime_sec, "Offset uptime in seconds");' >> kernel/time/timekeeping.c
-
-          sed -i '/ts->tv_sec = tk->tkr_mono.xtime_sec + tk->wall_to_monotonic.tv_sec;/a \    ts->tv_sec += fake_uptime_sec;' kernel/time/timekeeping.c
+          # 4. Dynamic Uptime
+          if ! grep -q "fake_uptime_sec" kernel/time/timekeeping.c; then
+            echo '#include <linux/moduleparam.h>' >> kernel/time/timekeeping.c
+            echo 'static int fake_uptime_sec = 86400;' >> kernel/time/timekeeping.c
+            echo 'module_param(fake_uptime_sec, int, 0644);' >> kernel/time/timekeeping.c
+            echo 'MODULE_PARM_DESC(fake_uptime_sec, "Offset uptime in seconds");' >> kernel/time/timekeeping.c
+            sed -i '/ts->tv_sec = tk->tkr_mono.xtime_sec + tk->wall_to_monotonic.tv_sec;/a \    ts->tv_sec += fake_uptime_sec;' kernel/time/timekeeping.c
+          fi
 
 
       - name: Build Kernel Image
