@@ -37,7 +37,7 @@ jobs:
           echo "CONFIG_KSU_SUSFS_SUS_PATH=y" >> arch/arm64/configs/lavender-perf_defconfig
           echo "CONFIG_KSU_SUSFS_SUS_MOUNT=y" >> arch/arm64/configs/lavender-perf_defconfig
 
-          # 2. Manual Hooks untuk kernel 4.4
+          # 2. Manual Hooks (versi aman dulu)
 
           # fs/exec.c
           if ! grep -q "ksu_handle_execveat" fs/exec.c; then
@@ -49,12 +49,6 @@ jobs:
           if ! grep -q "ksu_handle_faccessat" fs/open.c; then
             sed -i '/SYSCALL_DEFINE3(faccessat, int, dfd, const char __user \*, filename, int, mode)/i#ifdef CONFIG_KSU\n__attribute__((hot))\nextern int ksu_handle_faccessat(int *dfd, const char __user **filename_user,\n\t\t\t\tint *mode, int *flags);\n#endif' fs/open.c
             sed -i '/if (mode \& \~S_IRWXO)/i#ifdef CONFIG_KSU\n\tksu_handle_faccessat(\&dfd, \&filename, \&mode, NULL);\n#endif' fs/open.c
-          fi
-
-          # fs/read_write.c
-          if ! grep -q "ksu_handle_sys_read" fs/read_write.c; then
-            sed -i '/SYSCALL_DEFINE3(read, unsigned int, fd, char __user \*, buf, size_t, count)/i#ifdef CONFIG_KSU\nextern bool ksu_vfs_read_hook __read_mostly;\nextern __attribute__((cold)) int ksu_handle_sys_read(unsigned int fd,\n\t\t\t\tchar __user **buf_ptr, size_t *count_ptr);\n#endif' fs/read_write.c
-            sed -i '/struct fd f = fdget_pos(fd);/a#ifdef CONFIG_KSU\n\tif (unlikely(ksu_vfs_read_hook))\n\t\tksu_handle_sys_read(fd, \&buf, \&count);\n#endif' fs/read_write.c
           fi
 
           # fs/stat.c
@@ -69,7 +63,7 @@ jobs:
             sed -i '/if (!ns_capable(pid_ns->user_ns, CAP_SYS_BOOT))/i#ifdef CONFIG_KSU\n\tksu_handle_sys_reboot(magic1, magic2, cmd, \&arg);\n#endif' kernel/reboot.c
           fi
 
-          echo "[+] Manual hooks applied"
+          echo "[+] Manual hooks applied (read skipped for now)"
 
           # 3. SUSFS
           git clone https://github.com/sidex15/ksu_susfs.git -b 4.4 susfs_patcher || true
