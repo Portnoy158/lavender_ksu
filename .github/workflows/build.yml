@@ -23,20 +23,27 @@ jobs:
           git clone --depth=1 https://github.com/LineageOS/android_prebuilts_gcc_linux-x86_aarch64_aarch64-linux-android-4.9 gcc64
           git clone --depth=1 https://github.com/LineageOS/android_prebuilts_gcc_linux-x86_arm_arm-linux-androideabi-4.9 gcc32
 
-      - name: Integrate Features (KSU Next, SUSFS, Dynamic Uptime)
+            - name: Integrate Features (KSU Next, SUSFS, Dynamic Uptime)
         run: |
           # Git Config
           git config user.name "Portnoy158"
           git config user.email "portnoy@example.com"
 
-          # 1. Integrate KernelSU Next (Repo Public Official)
-          git clone --depth=1 https://github.com/KernelSU-Next/KernelSU-Next.git KernelSU-Next
-          cp -r KernelSU-Next/kernel drivers/kernelsu
-          
-          # Inject KSU ke Drivers Makefile
-          grep -q "CONFIG_KSU" drivers/Makefile || echo 'obj-y += kernelsu/' >> drivers/Makefile
+          # ============================================
+          # 1. Integrate KernelSU Next (cara resmi)
+          # ============================================
+          curl -LSs "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/next/kernel/setup.sh" | bash -s legacy
 
+          # Enable config KSU
+          echo "CONFIG_KSU=y" >> arch/arm64/configs/lavender-perf_defconfig
+          echo "CONFIG_KSU_SUSFS=y" >> arch/arm64/configs/lavender-perf_defconfig
+          echo "CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT=y" >> arch/arm64/configs/lavender-perf_defconfig
+          echo "CONFIG_KSU_SUSFS_SUS_PATH=y" >> arch/arm64/configs/lavender-perf_defconfig
+          echo "CONFIG_KSU_SUSFS_SUS_MOUNT=y" >> arch/arm64/configs/lavender-perf_defconfig
+
+          # ============================================
           # 2. Integrate SUSFS (v1.5.5 for Kernel 4.4)
+          # ============================================
           git clone https://github.com/sidex15/ksu_susfs.git -b 4.4 susfs_patcher || true
           if [ -d "susfs_patcher" ]; then
             cp -r susfs_patcher/fs/susfs fs/ 2>/dev/null || true
@@ -46,15 +53,10 @@ jobs:
             patch -p1 < susfs_patcher/patches/fs/stat.c.patch 2>/dev/null || true
             patch -p1 < susfs_patcher/patches/fs/dcache.c.patch 2>/dev/null || true
           fi
-          
-          # Enable KSU & SUSFS Configs
-          echo "CONFIG_KSU=y" >> arch/arm64/configs/lavender-perf_defconfig
-          echo "CONFIG_KSU_SUSFS=y" >> arch/arm64/configs/lavender-perf_defconfig
-          echo "CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT=y" >> arch/arm64/configs/lavender-perf_defconfig
-          echo "CONFIG_KSU_SUSFS_SUS_PATH=y" >> arch/arm64/configs/lavender-perf_defconfig
-          echo "CONFIG_KSU_SUSFS_SUS_MOUNT=y" >> arch/arm64/configs/lavender-perf_defconfig
 
+          # ============================================
           # 3. Dynamic Uptime Hack (Permission Fix: 0644)
+          # ============================================
           echo '#include <linux/moduleparam.h>' >> kernel/time/timekeeping.c
           echo 'static int fake_uptime_sec = 86400;' >> kernel/time/timekeeping.c
           echo 'module_param(fake_uptime_sec, int, 0644);' >> kernel/time/timekeeping.c
