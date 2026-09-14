@@ -54,10 +54,10 @@ jobs:
           echo "CONFIG_KSU_SUSFS_SUS_PATH=y" >> arch/arm64/configs/lavender-perf_defconfig
           echo "CONFIG_KSU_SUSFS_SUS_MOUNT=y" >> arch/arm64/configs/lavender-perf_defconfig
 
-          # 3. Dynamic Uptime Hack
+          # 3. Dynamic Uptime Hack (Permission Fix: 0644)
           echo '#include <linux/moduleparam.h>' >> kernel/time/timekeeping.c
           echo 'static int fake_uptime_sec = 86400;' >> kernel/time/timekeeping.c
-          echo 'module_param(fake_uptime_sec, int, 0666);' >> kernel/time/timekeeping.c
+          echo 'module_param(fake_uptime_sec, int, 0644);' >> kernel/time/timekeeping.c
           echo 'MODULE_PARM_DESC(fake_uptime_sec, "Offset uptime in seconds");' >> kernel/time/timekeeping.c
 
           sed -i '/ts->tv_sec = tk->tkr_mono.xtime_sec + tk->wall_to_monotonic.tv_sec;/a \    ts->tv_sec += fake_uptime_sec;' kernel/time/timekeeping.c
