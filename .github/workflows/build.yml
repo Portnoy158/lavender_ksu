@@ -20,10 +20,14 @@ jobs:
           mkdir -p $GITHUB_WORKSPACE/toolchain
           cd $GITHUB_WORKSPACE/toolchain
           
-          # Clone AOSP Clang r383902 & GCC dari GitHub mirror (No Auth Required)
-          git clone --depth=1 https://github.com/cve-kernel/clang-r383902.git clang
+          # Download AOSP Clang r383902 Direct Tarball (Google Official No-Auth)
+          mkdir clang
+          curl -LSs "https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/android11-release/clang-r383902.tar.gz" | tar -xz -C clang
+          
+          # Clone GCC Cross Compilers
           git clone --depth=1 https://github.com/LineageOS/android_prebuilts_gcc_linux-x86_aarch64_aarch64-linux-android-4.9 gcc64
           git clone --depth=1 https://github.com/LineageOS/android_prebuilts_gcc_linux-x86_arm_arm-linux-androideabi-4.9 gcc32
+
 
       - name: Build Kernel Image
         run: |
