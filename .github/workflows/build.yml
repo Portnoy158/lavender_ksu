@@ -81,8 +81,15 @@ jobs:
           git clone --depth=1 https://github.com/osm0sis/AnyKernel3.git AnyKernel3
           cp out/arch/arm64/boot/Image.gz-dtb AnyKernel3/ 2>/dev/null || cp out/arch/arm64/boot/Image.gz AnyKernel3/
           cd AnyKernel3
+          
+          # Configure AnyKernel3 specifically for Lavender (SDM660)
+          sed -i 's/kernel.string=.*/kernel.string=Lavender-KSU-SUSFS-Uptime/' anykernel.sh
           sed -i 's/device.name1=.*/device.name1=lavender/' anykernel.sh
+          sed -i 's/block=.*/block=\/dev\/block\/bootdevice\/by-name\/boot;/' anykernel.sh
+          sed -i 's/is_slot_device=.*/is_slot_device=0;/' anykernel.sh
+          
           zip -r9 ../Lavender-KSU-SUSFS-Uptime.zip * -x .git README.md
+
 
       - name: Upload Flashable Zip
         uses: actions/upload-artifact@v4
