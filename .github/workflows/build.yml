@@ -82,16 +82,19 @@ jobs:
           cp out/arch/arm64/boot/Image.gz-dtb AnyKernel3/ 2>/dev/null || cp out/arch/arm64/boot/Image.gz AnyKernel3/
           cd AnyKernel3
 
-          # Overwrite anykernel.sh langsung dengan konfigurasi spesifik Lavender
+          # Overwrite anykernel.sh (tanpa indentasi di dalam file)
           cat << 'EOF' > anykernel.sh
-          # AnyKernel3 State Files
+          # AnyKernel3 by osm0sis @ xda-developers
+
+          ## AnyKernel setup
+          # begin properties
           properties() { '
           kernel.string=Lavender-KSU-SUSFS-Uptime
           do.devicecheck=1
           do.modules=0
           do.systemless=1
           do.cleanup=1
-          do.cleanuntil=makefile
+          do.cleanuponabort=0
           device.name1=lavender
           device.name2=Lavender
           device.name3=
@@ -99,20 +102,27 @@ jobs:
           device.name5=
           supported.versions=
           supported.patchlevels=
-          '; }
+          '; } # end properties
 
-          # Block device setup
+          # shell variables
           block=/dev/block/bootdevice/by-name/boot;
           is_slot_device=0;
-          ramdisk_available=auto;
-          boot_backup=auto;
+          ramdisk_compression=auto;
+          patch_vbmeta_flag=auto;
 
-          # AnyKernel setup
+          ## AnyKernel methods (DO NOT CHANGE)
+          # import patching functions/variables - see for reference
           . tools/ak3-core.sh;
 
-          # Flash image
-          split_boot;
-          flash_boot;
+          ## AnyKernel file attributes
+          # set permissions/ownership for included files
+          # (opsional, biasanya tidak perlu diubah)
+
+          ## AnyKernel boot install
+          dump_boot;
+
+          write_boot;
+          ## end boot install
           EOF
 
           zip -r9 ../Lavender-KSU-SUSFS-Uptime.zip * -x .git README.md
