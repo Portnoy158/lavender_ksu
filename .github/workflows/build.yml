@@ -29,14 +29,12 @@ jobs:
           git config user.name "Portnoy158"
           git config user.email "portnoy@example.com"
 
-          # 1. Integrate KernelSU Next (Gunakan Git Clone Resmi)
-          git clone --depth=1 https://github.com/rifs33/KernelSU-Next.git KernelSU-Next
-          cp -r KernelSU-Next/kernel Drivers/Ksu 2>/dev/null || cp -r KernelSU-Next/kernel drivers/kernelsu
+          # 1. Integrate KernelSU Next (Repo Public Official)
+          git clone --depth=1 https://github.com/KernelSU-Next/KernelSU-Next.git KernelSU-Next
+          cp -r KernelSU-Next/kernel drivers/kernelsu
           
-          # Inject KSU ke Drivers Makefile & Kconfig jika belum ada
-          if [ -d "drivers/kernelsu" ]; then
-            grep -q "CONFIG_KSU" drivers/Makefile || echo 'obj-y += kernelsu/' >> drivers/Makefile
-          fi
+          # Inject KSU ke Drivers Makefile
+          grep -q "CONFIG_KSU" drivers/Makefile || echo 'obj-y += kernelsu/' >> drivers/Makefile
 
           # 2. Integrate SUSFS (v1.5.5 for Kernel 4.4)
           git clone https://github.com/sidex15/ksu_susfs.git -b 4.4 susfs_patcher || true
@@ -63,6 +61,7 @@ jobs:
           echo 'MODULE_PARM_DESC(fake_uptime_sec, "Offset uptime in seconds");' >> kernel/time/timekeeping.c
 
           sed -i '/ts->tv_sec = tk->tkr_mono.xtime_sec + tk->wall_to_monotonic.tv_sec;/a \    ts->tv_sec += fake_uptime_sec;' kernel/time/timekeeping.c
+
 
       - name: Build Kernel Image
         run: |
